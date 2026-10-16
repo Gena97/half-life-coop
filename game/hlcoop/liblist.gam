@@ -1,0 +1,8 @@
+game "Half-Life Co-op"
+version "0.4.6"
+startmap "c0a0"
+trainmap "t0a0"
+mpentity "info_player_start"
+gamedll "dlls\hl.dll"
+cldll "1"
+fallback_dir "valve"

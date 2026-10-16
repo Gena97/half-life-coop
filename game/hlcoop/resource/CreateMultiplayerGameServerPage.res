@@ -1,0 +1,85 @@
+"Resource/CreateMultiplayerGameServerPage.res"
+{
+	"MapList"
+	{
+		"ControlName" "ComboBox"
+		"fieldName" "MapList"
+		"xpos" "28"
+		"ypos" "28"
+		"wide" "380"
+		"tall" "24"
+		"visible" "0"
+		"enabled" "0"
+		"editable" "0"
+	}
+	"Label1"
+	{
+		"ControlName" "Label"
+		"fieldName" "Label1"
+		"xpos" "28"
+		"ypos" "28"
+		"wide" "380"
+		"tall" "24"
+		"visible" "0"
+		"enabled" "0"
+		"labelText" ""
+		"associate" "MapList"
+	}
+	"CampaignSelectionInfo"
+	{
+		"ControlName" "Label"
+		"fieldName" "CampaignSelectionInfo"
+		"xpos" "28"
+		"ypos" "28"
+		"wide" "380"
+		"tall" "52"
+		"visible" "1"
+		"enabled" "1"
+		"labelText" "Выберите главу или карту на второй вкладке"
+		"textAlignment" "west"
+		"wrap" "1"
+	}
+	"CampaignSelectionDetails"
+	{
+		"ControlName" "Label"
+		"fieldName" "CampaignSelectionDetails"
+		"xpos" "28"
+		"ypos" "84"
+		"wide" "380"
+		"tall" "52"
+		"visible" "1"
+		"enabled" "1"
+		"labelText" "Сначала идут названия глав, затем отдельные карты кампании"
+		"textAlignment" "west"
+		"wrap" "1"
+	}
+	"EnableSteamNetworkingCheck"
+	{
+		"ControlName" "CheckButton"
+		"fieldName" "EnableSteamNetworkingCheck"
+		"xpos" "28"
+		"ypos" "156"
+		"wide" "380"
+		"tall" "24"
+		"visible" "1"
+		"enabled" "1"
+		"tabPosition" "1"
+		"labelText" "#Valve_Enable_SteamNetworking"
+		"textAlignment" "west"
+		"Default" "1"
+	}
+	"BotQuotaCombo"
+	{
+		"ControlName" "TextEntry"
+		"fieldName" "BotQuotaCombo"
+		"visible" "0"
+		"enabled" "0"
+	}
+	"EnableBotsCheck"
+	{
+		"ControlName" "CheckButton"
+		"fieldName" "EnableBotsCheck"
+		"visible" "0"
+		"enabled" "0"
+	}
+}

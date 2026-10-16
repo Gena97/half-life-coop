@@ -1,0 +1,10 @@
+Half-Life Co-op 0.4.6
+
+Original Half-Life campaign from the tram to the finale
+Weapons and equipment are acquired during the story
+Map transitions move the whole group and preserve progress
+Friendly fire is enabled by default
+
+Host: F6 saves the whole session, F7 loads it
+Use coop_save NAME / coop_load NAME in the console
+After death, respawn near the current checkpoint

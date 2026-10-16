@@ -1,0 +1,19 @@
+# Результаты сборки и локальные настройки Visual Studio
+/build/
+/artifacts/
+/.vs/
+*.user
+*.suo
+/projects/vs2019/Debug/
+/projects/vs2019/Release/
+
+# Скомпилированные библиотеки и отладочные символы пакета мода
+/game/hlcoop/dlls/*.dll
+/game/hlcoop/dlls/*.pdb
+/game/hlcoop/cl_dlls/*.dll
+/game/hlcoop/cl_dlls/*.pdb
+/game/hlcoop/update-manifest.json
+
+# Кеш Python для локальных инструментов проверки
+__pycache__/
+*.pyc

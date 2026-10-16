@@ -1,0 +1,236 @@
+{
+  "id": "half-life",
+  "title": "Half-Life — оригинальная кампания",
+  "startMap": "c0a0",
+  "chapters": [
+    {
+      "id": "black-mesa-inbound",
+      "title": "Прибытие в Чёрную Мезу",
+      "startMap": "c0a0",
+      "maps": [
+        "c0a0",
+        "c0a0a",
+        "c0a0b",
+        "c0a0c",
+        "c0a0d",
+        "c0a0e"
+      ]
+    },
+    {
+      "id": "anomalous-materials",
+      "title": "Аномальные материалы",
+      "startMap": "c1a0",
+      "maps": [
+        "c1a0",
+        "c1a0d",
+        "c1a0a",
+        "c1a0b",
+        "c1a0e"
+      ]
+    },
+    {
+      "id": "unforeseen-consequences",
+      "title": "Непредвиденные последствия",
+      "startMap": "c1a0c",
+      "maps": [
+        "c1a0c",
+        "c1a1",
+        "c1a1a",
+        "c1a1f",
+        "c1a1b",
+        "c1a1c",
+        "c1a1d"
+      ]
+    },
+    {
+      "id": "office-complex",
+      "title": "Офисный комплекс",
+      "startMap": "c1a2",
+      "maps": [
+        "c1a2",
+        "c1a2a",
+        "c1a2b",
+        "c1a2c",
+        "c1a2d"
+      ]
+    },
+    {
+      "id": "weve-got-hostiles",
+      "title": "«У нас враги!»",
+      "startMap": "c1a3",
+      "maps": [
+        "c1a3",
+        "c1a3d",
+        "c1a3a",
+        "c1a3b",
+        "c1a3c"
+      ]
+    },
+    {
+      "id": "blast-pit",
+      "title": "Ракетная шахта",
+      "startMap": "c1a4",
+      "maps": [
+        "c1a4",
+        "c1a4k",
+        "c1a4b",
+        "c1a4d",
+        "c1a4e",
+        "c1a4f",
+        "c1a4i",
+        "c1a4g",
+        "c1a4j"
+      ]
+    },
+    {
+      "id": "power-up",
+      "title": "Подача энергии",
+      "startMap": "c2a1",
+      "maps": [
+        "c2a1",
+        "c2a1b",
+        "c2a1a"
+      ]
+    },
+    {
+      "id": "on-a-rail",
+      "title": "По рельсам",
+      "startMap": "c2a2",
+      "maps": [
+        "c2a2",
+        "c2a2a",
+        "c2a2b1",
+        "c2a2b2",
+        "c2a2c",
+        "c2a2d",
+        "c2a2e",
+        "c2a2f",
+        "c2a2g",
+        "c2a2h"
+      ]
+    },
+    {
+      "id": "apprehension",
+      "title": "Задержание",
+      "startMap": "c2a3",
+      "maps": [
+        "c2a3",
+        "c2a3a",
+        "c2a3b",
+        "c2a3c",
+        "c2a3d",
+        "c2a3e"
+      ]
+    },
+    {
+      "id": "residue-processing",
+      "title": "Переработка отходов",
+      "startMap": "c2a4",
+      "maps": [
+        "c2a4",
+        "c2a4a",
+        "c2a4b",
+        "c2a4c"
+      ]
+    },
+    {
+      "id": "questionable-ethics",
+      "title": "Сомнительная этика",
+      "startMap": "c2a4d",
+      "maps": [
+        "c2a4d",
+        "c2a4e",
+        "c2a4f",
+        "c2a4g"
+      ]
+    },
+    {
+      "id": "surface-tension",
+      "title": "Поверхностное натяжение",
+      "startMap": "c2a5",
+      "maps": [
+        "c2a5",
+        "c2a5w",
+        "c2a5x",
+        "c2a5a",
+        "c2a5b",
+        "c2a5c",
+        "c2a5d",
+        "c2a5e",
+        "c2a5f",
+        "c2a5g"
+      ]
+    },
+    {
+      "id": "forget-about-freeman",
+      "title": "«Забудьте о Фримене!»",
+      "startMap": "c3a1",
+      "maps": [
+        "c3a1",
+        "c3a1a",
+        "c3a1b"
+      ]
+    },
+    {
+      "id": "lambda-core",
+      "title": "Ядро Лямбды",
+      "startMap": "c3a2e",
+      "maps": [
+        "c3a2e",
+        "c3a2",
+        "c3a2a",
+        "c3a2b",
+        "c3a2c",
+        "c3a2f",
+        "c3a2d"
+      ]
+    },
+    {
+      "id": "xen",
+      "title": "Зен",
+      "startMap": "c4a1",
+      "maps": [
+        "c4a1"
+      ]
+    },
+    {
+      "id": "gonarchs-lair",
+      "title": "Логово Гонарха",
+      "startMap": "c4a2",
+      "maps": [
+        "c4a2",
+        "c4a2a",
+        "c4a2b"
+      ]
+    },
+    {
+      "id": "interloper",
+      "title": "Нарушитель",
+      "startMap": "c4a1a",
+      "maps": [
+        "c4a1a",
+        "c4a1b",
+        "c4a1c",
+        "c4a1d",
+        "c4a1e",
+        "c4a1f"
+      ]
+    },
+    {
+      "id": "nihilanth",
+      "title": "Нихилант",
+      "startMap": "c4a3",
+      "maps": [
+        "c4a3"
+      ]
+    },
+    {
+      "id": "endgame",
+      "title": "Конец игры",
+      "startMap": "c5a1",
+      "maps": [
+        "c5a1"
+      ]
+    }
+  ]
+}
