@@ -1,5 +1,5 @@
 game "Half-Life Co-op"
-version "0.4.7"
+version "0.4.9"
 startmap "c0a0"
 trainmap "t0a0"
 mpentity "info_player_start"

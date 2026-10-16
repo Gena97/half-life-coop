@@ -3,8 +3,7 @@ param(
     [switch]$Launch,
     [switch]$CheckOnly,
     [switch]$SkipUpdate,
-    [switch]$CreateShortcutOnly,
-    [string]$ShortcutModPath
+    [switch]$LibraryOnly
 )
 
 Set-StrictMode -Version Latest
@@ -240,106 +239,6 @@ function Assert-GameStopped
             $process.CommandLine -match '(?i)(?:^|\s)-game\s+"?hlcoop(?:"|\s|$)')
         {
             throw 'Half-Life или её сервер уже работает: обновление будет установлено после закрытия игры'
-        }
-    }
-}
-
-function New-CoopDesktopShortcut
-{
-    param([string]$TargetModPath = $modPath)
-
-    $shell = $null
-    $shortcut = $null
-    $temporaryPath = $null
-    try
-    {
-        $targetPath = [System.IO.Path]::GetFullPath($TargetModPath).TrimEnd('\')
-        if (!(Split-Path -Leaf $targetPath).Equals('hlcoop', [System.StringComparison]::OrdinalIgnoreCase))
-        {
-            throw 'Выберите установленную папку hlcoop'
-        }
-        $workingPath = Split-Path -Parent $targetPath
-        $launcherPath = Assert-PlainPath -Path (Join-Path $targetPath 'start-hlcoop.cmd') -Boundary $targetPath
-        $enginePath = Assert-PlainPath -Path (Join-Path $workingPath 'hl.exe') -Boundary $workingPath
-        if (!(Test-Path -LiteralPath $launcherPath -PathType Leaf) -or
-            !(Test-Path -LiteralPath $enginePath -PathType Leaf))
-        {
-            throw 'Не найдены start-hlcoop.cmd или hl.exe в установленной игре'
-        }
-        $desktopPath = [Environment]::GetFolderPath([Environment+SpecialFolder]::DesktopDirectory)
-        if ([string]::IsNullOrWhiteSpace($desktopPath) -or
-            !(Test-Path -LiteralPath $desktopPath -PathType Container))
-        {
-            throw 'Недоступна папка рабочего стола текущего пользователя'
-        }
-        $shell = New-Object -ComObject WScript.Shell
-        for ($index = 0; $index -lt 100; $index++)
-        {
-            $name = 'Half-Life Co-op.lnk'
-            if ($index -gt 0) { $name = "Half-Life Co-op ($index).lnk" }
-            $shortcutPath = Assert-PlainPath -Path (Join-Path $desktopPath $name) -Boundary $desktopPath
-            if (Test-Path -LiteralPath $shortcutPath)
-            {
-                if (Test-Path -LiteralPath $shortcutPath -PathType Leaf)
-                {
-                    $existingShortcut = $null
-                    try
-                    {
-                        $existingShortcut = $shell.CreateShortcut($shortcutPath)
-                        if ($launcherPath.Equals($existingShortcut.TargetPath, [System.StringComparison]::OrdinalIgnoreCase) -and
-                            [string]::IsNullOrWhiteSpace($existingShortcut.Arguments))
-                        {
-                            return $true
-                        }
-                    }
-                    catch
-                    {
-                        # Чужой или повреждённый ярлык оставляем на месте
-                    }
-                    finally
-                    {
-                        if ($null -ne $existingShortcut)
-                        {
-                            try { [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($existingShortcut) } catch { }
-                        }
-                    }
-                }
-                continue
-            }
-
-            # Перемещение без замены не даст перезаписать ярлык, созданный одновременно
-            $temporaryPath = Join-Path $desktopPath ('.hlcoop-shortcut-' + [guid]::NewGuid().ToString('N') + '.lnk')
-            $shortcut = $shell.CreateShortcut($temporaryPath)
-            $shortcut.TargetPath = $launcherPath
-            $shortcut.WorkingDirectory = $workingPath
-            $shortcut.IconLocation = "$enginePath,0"
-            $shortcut.Description = 'Half-Life Co-op с проверкой обновлений'
-            $shortcut.Save()
-            [System.IO.File]::Move($temporaryPath, $shortcutPath)
-            $temporaryPath = $null
-            Write-Host "Ярлык Half-Life Co-op создан на рабочем столе: $shortcutPath"
-            return $true
-        }
-        throw 'На рабочем столе нет свободного имени для ярлыка Half-Life Co-op'
-    }
-    catch
-    {
-        Write-Host "Не удалось создать ярлык: $($_.Exception.Message)" -ForegroundColor Yellow
-        return $false
-    }
-    finally
-    {
-        if ($null -ne $shortcut)
-        {
-            try { [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($shortcut) } catch { }
-        }
-        if ($null -ne $shell)
-        {
-            try { [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($shell) } catch { }
-        }
-        if ($null -ne $temporaryPath -and [System.IO.File]::Exists($temporaryPath))
-        {
-            try { [System.IO.File]::Delete($temporaryPath) } catch { }
         }
     }
 }
@@ -864,26 +763,9 @@ function Remove-OwnWorkDirectory
     Remove-Item -LiteralPath $fullPath -Recurse -Force
 }
 
-if ($CreateShortcutOnly)
+if ($LibraryOnly)
 {
-    if ($Launch -or $CheckOnly -or $SkipUpdate)
-    {
-        Write-Host 'Параметр CreateShortcutOnly используется отдельно от запуска и проверки обновлений' -ForegroundColor Red
-        exit 1
-    }
-    $targetModPath = $modPath
-    if (![string]::IsNullOrWhiteSpace($ShortcutModPath)) { $targetModPath = $ShortcutModPath }
-    if (New-CoopDesktopShortcut -TargetModPath $targetModPath) { exit 0 }
-    exit 1
-}
-if (![string]::IsNullOrWhiteSpace($ShortcutModPath))
-{
-    Write-Host 'Параметр ShortcutModPath используется только с CreateShortcutOnly' -ForegroundColor Red
-    exit 1
-}
-if ($Launch -and !$CheckOnly)
-{
-    [void](New-CoopDesktopShortcut)
+    return
 }
 
 $transactionId = [guid]::NewGuid().ToString('N')

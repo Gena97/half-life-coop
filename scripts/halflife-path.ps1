@@ -141,6 +141,33 @@
         }
     }
 
+    # Разрядность запускателя не должна скрывать другую ветку реестра Steam
+    foreach ($registryView in @([Microsoft.Win32.RegistryView]::Registry64, [Microsoft.Win32.RegistryView]::Registry32))
+    {
+        $registryBase = $null
+        $steamKey = $null
+        try
+        {
+            $registryBase = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, $registryView)
+            $steamKey = $registryBase.OpenSubKey('Software\Valve\Steam', $false)
+            if ($null -eq $steamKey) { continue }
+            $registryValue = $steamKey.GetValue('InstallPath', $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+            if ($registryValue -isnot [string] -or [string]::IsNullOrWhiteSpace($registryValue)) { continue }
+            $candidate = [System.Environment]::ExpandEnvironmentVariables($registryValue)
+            $steamRoot = Get-HalfLifeDirectoryPath -Path $candidate -RequireAbsolute
+            if ($null -ne $steamRoot) { [void]$steamRoots.Add($steamRoot) }
+        }
+        catch
+        {
+            continue
+        }
+        finally
+        {
+            if ($null -ne $steamKey) { $steamKey.Dispose() }
+            if ($null -ne $registryBase) { $registryBase.Dispose() }
+        }
+    }
+
     # Стандартные каталоги доступны и при отсутствии записей Steam в реестре
     foreach ($environmentName in @('ProgramFiles(x86)', 'ProgramFiles'))
     {

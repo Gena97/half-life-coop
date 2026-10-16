@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Тег выпуска, например v0.4.6'
+        description: 'Тег выпуска в формате vX.Y.Z'
         required: true
         type: string
 
@@ -99,6 +99,19 @@ jobs:
               throw 'Packaging failed'
           }
 
+      - name: Build launcher and checksum
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          $LASTEXITCODE = 0
+          & .\scripts\build-launcher.ps1 -PackagePath "artifacts/hlcoop-${env:RELEASE_VERSION}-win32.zip"
+          if ($LASTEXITCODE -ne 0)
+          {
+              throw 'Launcher build failed'
+          }
+
       - name: Publish complete release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -108,7 +121,9 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $archivePath = Join-Path $env:GITHUB_WORKSPACE "artifacts/hlcoop-${env:RELEASE_VERSION}-win32.zip"
           $checksumPath = "$archivePath.sha256"
-          foreach ($path in @($archivePath, $checksumPath))
+          $launcherPath = Join-Path $env:GITHUB_WORKSPACE 'artifacts/HLCoopLauncher.exe'
+          $launcherChecksumPath = "$launcherPath.sha256"
+          foreach ($path in @($archivePath, $checksumPath, $launcherPath, $launcherChecksumPath))
           {
               if (!(Test-Path -LiteralPath $path -PathType Leaf))
               {
@@ -116,11 +131,11 @@ jobs:
               }
           }
 
-          # Публикуем только после успешной загрузки обоих файлов в черновик
-          & gh release create $env:RELEASE_TAG $archivePath $checksumPath --repo $env:GITHUB_REPOSITORY --verify-tag --generate-notes --draft
+          # Публикуем только после успешной загрузки архива, лаунчера и обеих контрольных сумм
+          & gh release create $env:RELEASE_TAG $archivePath $checksumPath $launcherPath $launcherChecksumPath --repo $env:GITHUB_REPOSITORY --verify-tag --generate-notes --draft
           if ($LASTEXITCODE -ne 0)
           {
-              throw 'Could not create a draft release with both assets'
+              throw 'Could not create a draft release with all assets'
           }
           & gh release edit $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --draft=false --latest
           if ($LASTEXITCODE -ne 0)
