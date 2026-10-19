@@ -100,6 +100,12 @@ jobs:
               throw 'The configured update repository must match this repository'
           }
 
+      - name: Prepare Microsoft Defender on hosted runner
+        timeout-minutes: 5
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & .\scripts\prepare-release-defender.ps1
+
       - name: Build release libraries
         run: |
           Set-StrictMode -Version Latest
@@ -152,6 +158,7 @@ jobs:
           & .\scripts\sign-launcher-update.ps1
 
       - name: Verify final release and scan with Defender
+        timeout-minutes: 10
         env:
           REQUIRE_AUTHENTICODE: ${{ secrets.HLC_AUTHENTICODE_PFX_BASE64 != '' }}
         run: |

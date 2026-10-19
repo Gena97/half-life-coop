@@ -16,6 +16,34 @@ $outputPath = [IO.Path]::GetFullPath($OutputDirectory)
 $reportPath = Join-Path $outputPath 'release-verification.json'
 $started = [DateTime]::UtcNow
 $report = [ordered]@{ schemaVersion = 1; status = 'failed'; generatedAtUtc = $started.ToString('o'); assets = @() }
+
+function Get-CoopDefenderState
+{
+    param([object]$Status)
+
+    return [ordered]@{
+        serviceEnabled = [bool]$Status.AMServiceEnabled
+        antivirusEnabled = [bool]$Status.AntivirusEnabled
+        realtimeEnabled = [bool]$Status.RealTimeProtectionEnabled
+        runningMode = [string]$Status.AMRunningMode
+        engineVersion = [string]$Status.AMEngineVersion
+        signatureVersion = [string]$Status.AntivirusSignatureVersion
+    }
+}
+
+function Assert-CoopDefenderReady
+{
+    param([object]$Status)
+
+    if (!$Status.AMServiceEnabled -or !$Status.AntivirusEnabled -or
+        !$Status.RealTimeProtectionEnabled -or $Status.AMRunningMode -ne 'Normal' -or
+        [string]::IsNullOrWhiteSpace([string]$Status.AMEngineVersion) -or $Status.AMEngineVersion -eq '0.0.0.0')
+    {
+        $details = Get-CoopDefenderState -Status $Status | ConvertTo-Json -Compress
+        throw "Публикация запрещена: Microsoft Defender не готов к проверке. Состояние: $details"
+    }
+}
+
 try
 {
     $launcherPath = Join-Path $outputPath 'HLCoopLauncher.exe'
@@ -156,11 +184,15 @@ try
     }
     $report.authenticode = [string]$authenticode.Status
     $status = Get-MpComputerStatus -ErrorAction Stop
-    if (!$status.AMServiceEnabled -or !$status.AntivirusEnabled -or !$status.RealTimeProtectionEnabled -or $status.AMRunningMode -ne 'Normal')
+    $report.defenderBeforeScan = Get-CoopDefenderState -Status $status
+    Write-Host ('Microsoft Defender: ' + ($report.defenderBeforeScan | ConvertTo-Json -Compress))
+    Assert-CoopDefenderReady -Status $status
+    if ($UpdateSignatures)
     {
-        throw 'Публикация запрещена: Microsoft Defender должен быть включён и работать в обычном режиме'
+        Update-MpSignature -UpdateSource MMPC -ErrorAction Stop
+        $status = Get-MpComputerStatus -ErrorAction Stop
+        Assert-CoopDefenderReady -Status $status
     }
-    if ($UpdateSignatures) { Update-MpSignature -ErrorAction Stop; $status = Get-MpComputerStatus -ErrorAction Stop }
     if (([DateTime]::UtcNow - $status.AntivirusSignatureLastUpdated.ToUniversalTime()).TotalHours -gt $MaximumSignatureAgeHours)
     {
         throw 'Публикация запрещена: базы Microsoft Defender устарели'
@@ -199,7 +231,8 @@ try
         }
     }
     $finalStatus = Get-MpComputerStatus -ErrorAction Stop
-    if (!$finalStatus.AntivirusEnabled -or !$finalStatus.RealTimeProtectionEnabled) { throw 'Defender выключен во время проверки' }
+    $report.defenderAfterScan = Get-CoopDefenderState -Status $finalStatus
+    Assert-CoopDefenderReady -Status $finalStatus
     $report.defender = [ordered]@{ signatureVersion = $status.AntivirusSignatureVersion; signatureUpdatedUtc = $status.AntivirusSignatureLastUpdated.ToUniversalTime().ToString('o'); customScanPassed = $true; scanMode = 'custom-ignore-exclusions-no-remediation' }
     $report.version = $manifest.version
     $report.keyId = $public.keyId
