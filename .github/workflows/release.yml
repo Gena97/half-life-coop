@@ -23,6 +23,8 @@ jobs:
     runs-on: windows-2022
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     env:
       RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
     defaults:
@@ -38,9 +40,11 @@ jobs:
           }
 
       - name: Checkout sources
-        uses: actions/checkout@v4
+        # Официальный actions/checkout v7.0.1 закреплён по коммиту
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
 
       - name: Validate version and configure updates
         id: version
@@ -77,6 +81,25 @@ jobs:
           [System.IO.File]::WriteAllText($configPath, ($config | ConvertTo-Json -Depth 6) + "`r`n", $encoding)
           [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "version=$version`n", $encoding)
 
+      - name: Validate update signing key
+        env:
+          HLC_UPDATE_PRIVATE_KEY_BASE64: ${{ secrets.HLC_UPDATE_PRIVATE_KEY_BASE64 }}
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:HLC_UPDATE_PRIVATE_KEY_BASE64))
+          {
+              throw 'Configure the HLC_UPDATE_PRIVATE_KEY_BASE64 repository secret before releasing'
+          }
+          . .\scripts\update-signing.ps1
+          $rsa = Open-CoopUpdateRsa -Private
+          $rsa.Dispose()
+          $config = Get-Content -LiteralPath 'game/hlcoop/update.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ($config.repository -cne $env:GITHUB_REPOSITORY)
+          {
+              throw 'The configured update repository must match this repository'
+          }
+
       - name: Build release libraries
         run: |
           Set-StrictMode -Version Latest
@@ -112,6 +135,36 @@ jobs:
               throw 'Launcher build failed'
           }
 
+      - name: Apply optional Authenticode signature
+        env:
+          HLC_AUTHENTICODE_PFX_BASE64: ${{ secrets.HLC_AUTHENTICODE_PFX_BASE64 }}
+          HLC_AUTHENTICODE_PFX_PASSWORD: ${{ secrets.HLC_AUTHENTICODE_PFX_PASSWORD }}
+          HLC_AUTHENTICODE_THUMBPRINT: ${{ secrets.HLC_AUTHENTICODE_THUMBPRINT }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & .\scripts\sign-authenticode.ps1
+
+      - name: Sign final launcher update manifest
+        env:
+          HLC_UPDATE_PRIVATE_KEY_BASE64: ${{ secrets.HLC_UPDATE_PRIVATE_KEY_BASE64 }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & .\scripts\sign-launcher-update.ps1
+
+      - name: Verify final release and scan with Defender
+        env:
+          REQUIRE_AUTHENTICODE: ${{ secrets.HLC_AUTHENTICODE_PFX_BASE64 != '' }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & .\scripts\verify-launcher-release.ps1 -UpdateSignatures -RequireAuthenticode:($env:REQUIRE_AUTHENTICODE -eq 'true')
+
+      - name: Attest launcher provenance
+        if: ${{ vars.HLC_ENABLE_ATTESTATIONS == 'true' }}
+        # Официальный actions/attest v4.2.2 закреплён по коммиту
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-path: artifacts/HLCoopLauncher.exe
+
       - name: Publish complete release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -123,7 +176,11 @@ jobs:
           $checksumPath = "$archivePath.sha256"
           $launcherPath = Join-Path $env:GITHUB_WORKSPACE 'artifacts/HLCoopLauncher.exe'
           $launcherChecksumPath = "$launcherPath.sha256"
-          foreach ($path in @($archivePath, $checksumPath, $launcherPath, $launcherChecksumPath))
+          $manifestPath = Join-Path $env:GITHUB_WORKSPACE 'artifacts/launcher-update.json'
+          $signaturePath = Join-Path $env:GITHUB_WORKSPACE 'artifacts/launcher-update.sig'
+          $reportPath = Join-Path $env:GITHUB_WORKSPACE 'artifacts/release-verification.json'
+          $assetPaths = @($archivePath, $checksumPath, $launcherPath, $launcherChecksumPath, $manifestPath, $signaturePath, $reportPath)
+          foreach ($path in $assetPaths)
           {
               if (!(Test-Path -LiteralPath $path -PathType Leaf))
               {
@@ -131,8 +188,31 @@ jobs:
               }
           }
 
-          # Публикуем только после успешной загрузки архива, лаунчера и обеих контрольных сумм
-          & gh release create $env:RELEASE_TAG $archivePath $checksumPath $launcherPath $launcherChecksumPath --repo $env:GITHUB_REPOSITORY --verify-tag --generate-notes --draft
+          # После проверки не допускаем подмены ни одного файла релиза
+          $report = Get-Content -LiteralPath $reportPath -Raw -Encoding UTF8 | ConvertFrom-Json
+          $reportAge = ([DateTime]::UtcNow - [DateTime]::Parse($report.generatedAtUtc).ToUniversalTime()).TotalHours
+          $sourceCommit = (& git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $report.schemaVersion -ne 1 -or $report.status -cne 'passed' -or
+              $report.version -cne $env:RELEASE_VERSION -or $report.assets.Count -ne 6 -or
+              $report.sourceCommit -cne $sourceCommit -or $report.defender.customScanPassed -ne $true -or
+              $report.defender.scanMode -cne 'custom-ignore-exclusions-no-remediation' -or
+              $reportAge -gt 1 -or $reportAge -lt -0.05)
+          {
+              throw 'The release verification report is missing, stale or unsuccessful'
+          }
+          $verifiedNames = @{}
+          foreach ($asset in $report.assets)
+          {
+              $path = Join-Path (Join-Path $env:GITHUB_WORKSPACE 'artifacts') $asset.file
+              if ($verifiedNames.ContainsKey([string]$asset.file) -or $path -notin $assetPaths -or (Get-Item -LiteralPath $path).Length -ne $asset.bytes -or
+                  (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -cne $asset.sha256)
+              {
+                  throw 'A release asset changed after verification'
+              }
+              $verifiedNames[[string]$asset.file] = $true
+          }
+          # Публикуем только полностью проверенный комплект
+          & gh release create $env:RELEASE_TAG @assetPaths --repo $env:GITHUB_REPOSITORY --verify-tag --generate-notes --draft
           if ($LASTEXITCODE -ne 0)
           {
               throw 'Could not create a draft release with all assets'

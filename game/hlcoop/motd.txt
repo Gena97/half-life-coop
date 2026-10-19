@@ -1,4 +1,4 @@
-Half-Life Co-op 0.4.9
+Half-Life Co-op 0.4.10
 
 Original Half-Life campaign from the tram to the finale
 Weapons and equipment are acquired during the story

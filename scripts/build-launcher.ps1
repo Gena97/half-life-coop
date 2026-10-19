@@ -39,9 +39,12 @@ $outputPath = [System.IO.Path]::GetFullPath($OutputDirectory)
 $buildPath = Join-Path $repoRoot 'build\Launcher\Release'
 foreach ($requiredPath in @(
     (Join-Path $sourcePath 'Launcher.cpp'),
+    (Join-Path $sourcePath 'Native.cpp'),
+    (Join-Path $sourcePath 'Install.cpp'),
+    (Join-Path $sourcePath 'Update.cpp'),
     (Join-Path $sourcePath 'launcher.manifest'),
-    (Join-Path $sourcePath 'bootstrap.ps1'),
-    (Join-Path $PSScriptRoot 'halflife-path.ps1')
+    (Join-Path $sourcePath 'update-public-key.json'),
+    (Join-Path $sourcePath 'vendor\json.LICENSE.MIT')
 ))
 {
     if (!(Test-Path -LiteralPath $requiredPath -PathType Leaf))
@@ -129,35 +132,18 @@ elseif ($WindowsSdkVersion -notin @($availableSdks | ForEach-Object { $_.Name })
 New-Item -ItemType Directory -Path $buildPath -Force | Out-Null
 New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
 $utf8 = New-Object System.Text.UTF8Encoding($true)
-$packageHash = (Get-FileHash -LiteralPath $PackagePath -Algorithm SHA256).Hash.ToLowerInvariant()
 $updateConfig = Get-Content -LiteralPath (Join-Path $repoRoot 'game\hlcoop\update.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $repository = [string]$updateConfig.repository
 if ($repository -notmatch '^[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*$')
 {
     throw 'В update.json нужен адрес репозитория в формате владелец/репозиторий'
 }
-$bootstrap = [System.IO.File]::ReadAllText((Join-Path $sourcePath 'bootstrap.ps1'), [System.Text.Encoding]::UTF8)
-$pathResolver = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'halflife-path.ps1'), [System.Text.Encoding]::UTF8).TrimStart([char]0xFEFF)
-foreach ($placeholder in @('__HLC_PACKAGE_SHA256__', '__HLC_PACKAGE_VERSION__', '__HLC_REPOSITORY__', '# __HLC_PATH_RESOLVER__'))
-{
-    if (!$bootstrap.Contains($placeholder))
-    {
-        throw "В шаблоне bootstrap.ps1 отсутствует маркер $placeholder"
-    }
-}
-$bootstrap = $bootstrap.Replace('__HLC_PACKAGE_SHA256__', $packageHash).
-    Replace('__HLC_PACKAGE_VERSION__', $version).
-    Replace('__HLC_REPOSITORY__', $repository).
-    Replace('# __HLC_PATH_RESOLVER__', $pathResolver)
-if ($bootstrap -match '__HLC_[A-Z0-9_]+__')
-{
-    throw 'В bootstrap.ps1 остались незаполненные маркеры сборки'
-}
-
-# Windows PowerShell 5.1 читает русский текст из файла по BOM UTF-8
-[System.IO.File]::WriteAllText((Join-Path $buildPath 'bootstrap.ps1'), $bootstrap, $utf8)
-[System.IO.File]::WriteAllText((Join-Path $buildPath 'launcher-version.h'), "#pragma once`r`n#define HLC_LAUNCHER_VERSION `"$version`"`r`n", $utf8)
-Copy-Item -LiteralPath $PackagePath -Destination (Join-Path $buildPath 'payload.zip') -Force
+. (Join-Path $PSScriptRoot 'update-signing.ps1')
+[void](Get-CoopUpdatePublicKey)
+& (Join-Path $PSScriptRoot 'new-native-payload.ps1') -PackagePath $PackagePath -OutputDirectory $buildPath -Version $version | Out-Host
+[System.IO.File]::WriteAllText((Join-Path $buildPath 'launcher-version.h'), "#pragma once`r`n#define HLC_LAUNCHER_VERSION `"$version`"`r`n#define HLC_REPOSITORY `"$repository`"`r`n", $utf8)
+Copy-Item -LiteralPath (Join-Path $sourcePath 'update-public-key.json') -Destination (Join-Path $buildPath 'update-public-key.json') -Force
+Copy-Item -LiteralPath (Join-Path $sourcePath 'vendor\json.LICENSE.MIT') -Destination (Join-Path $buildPath 'json.LICENSE.MIT') -Force
 $launcherManifest = New-Object System.Xml.XmlDocument
 $launcherManifest.PreserveWhitespace = $true
 $launcherManifest.Load((Join-Path $sourcePath 'launcher.manifest'))
@@ -171,8 +157,10 @@ $manifestIdentity.SetAttribute('version', "$version.0")
 $versionNumbers = ($versionParts + @(0)) -join ','
 $resourceText = @"
 #include <windows.h>
-101 RCDATA "payload.zip"
-102 RCDATA "bootstrap.ps1"
+101 RCDATA "payload.cab"
+102 RCDATA "payload.json"
+103 RCDATA "update-public-key.json"
+104 RCDATA "json.LICENSE.MIT"
 CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "launcher.manifest"
 1 VERSIONINFO
 FILEVERSION $versionNumbers
@@ -205,6 +193,9 @@ END
 
 # Временный проект собирает один EXE и не меняет проекты Half-Life SDK
 $escapedSource = [System.Security.SecurityElement]::Escape((Join-Path $sourcePath 'Launcher.cpp'))
+$escapedNative = [System.Security.SecurityElement]::Escape((Join-Path $sourcePath 'Native.cpp'))
+$escapedInstall = [System.Security.SecurityElement]::Escape((Join-Path $sourcePath 'Install.cpp'))
+$escapedUpdate = [System.Security.SecurityElement]::Escape((Join-Path $sourcePath 'Update.cpp'))
 $projectText = @"
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
@@ -249,11 +240,14 @@ $projectText = @"
       <SubSystem>Windows</SubSystem>
       <GenerateManifest>false</GenerateManifest>
       <GenerateDebugInformation>false</GenerateDebugInformation>
-      <AdditionalDependencies>user32.lib;gdi32.lib;shell32.lib;ole32.lib;advapi32.lib;comctl32.lib;version.lib;uuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>user32.lib;gdi32.lib;shell32.lib;ole32.lib;advapi32.lib;comctl32.lib;version.lib;uuid.lib;cabinet.lib;winhttp.lib;bcrypt.lib;crypt32.lib;wintrust.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="$escapedSource" />
+    <ClCompile Include="$escapedNative" />
+    <ClCompile Include="$escapedInstall" />
+    <ClCompile Include="$escapedUpdate" />
     <ResourceCompile Include="launcher.rc" />
   </ItemGroup>
   <Import Project="`$(VCTargetsPath)\Microsoft.Cpp.targets" />
